@@ -167,9 +167,8 @@ app.post("/render", upload.single("image"), async (req, res) => {
 
       // Fullscreen user image overlay (no motion).
       `[1:v]format=rgba,scale=${W}:${H}[ol];` +
-        `[ol]colorchannelmixer=aa=${overlayAlpha}[ol2];` +
-        `[base][ol2]overlay=0:0:enable='${enableExpr}'[v0];` +
-        `[v0]drawtext=fontcolor=white:fontsize=round(h*0.05):text='${mantraText}':x=(w-text_w)/2:y=h-(text_h*1.8):enable='between(t,${textStart},${textEnd})'[vid]`,
+  `[ol]colorchannelmixer=aa=${overlayAlpha}[ol2];` +
+  `[base][ol2]overlay=0:0:enable='${enableExpr}'[vid]`,
     ].join("");
 
     const args = [
