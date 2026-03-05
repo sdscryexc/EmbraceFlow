@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$FLOW — Embrace The Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Outfit:wght@100;200;300;400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--abyss:#010a14;--deep:#021224;--ocean:#0a2540;--surface:#103050;--glow:#3adbff;--glow2:#1a8aff;--glow3:#00e5ff;--foam:rgba(200,240,255,.9);--text:#c4dff0;--white:#e8f4ff;--danger:#ff3a5c}
+html{scroll-behavior:smooth;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(58,219,255,.15) transparent}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(58,219,255,.15);border-radius:4px}
+body{background:var(--abyss);color:var(--text);font-family:'Outfit',sans-serif;font-weight:300;line-height:1.7;overflow-x:hidden}
+::selection{background:rgba(58,219,255,.2);color:#fff}
+#waterCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.8}
+.cursor-glow{position:fixed;width:500px;height:500px;border-radius:50%;pointer-events:none;z-index:1;background:radial-gradient(circle,rgba(58,219,255,.035) 0%,transparent 70%);transform:translate(-50%,-50%);mix-blend-mode:screen}
+.loader{position:fixed;inset:0;z-index:9999;background:var(--abyss);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s ease,visibility .8s}
+.loader.done{opacity:0;visibility:hidden;pointer-events:none}
+.loader-ring{width:50px;height:50px;border-radius:50%;border:1.5px solid rgba(58,219,255,.08);border-top-color:var(--glow);animation:spin 1.2s linear infinite}
+.loader-text{margin-top:1.5rem;font-size:.58rem;letter-spacing:.5em;text-transform:uppercase;color:var(--glow);opacity:.35}
+@keyframes spin{to{transform:rotate(360deg)}}
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;padding:1.4rem 3.5rem;transition:all .6s cubic-bezier(.23,1,.32,1)}
+nav.solid{background:rgba(1,10,20,.88);backdrop-filter:blur(40px) saturate(1.6);border-bottom:1px solid rgba(58,219,255,.05);padding:1rem 3.5rem}
+.nav-brand{font-family:'Cormorant',serif;font-size:1.5rem;font-weight:600;letter-spacing:.06em;color:var(--glow);text-shadow:0 0 30px rgba(58,219,255,.3);display:flex;align-items:center;gap:.6rem}
+.nav-brand .dot{width:6px;height:6px;border-radius:50%;background:var(--glow);box-shadow:0 0 10px var(--glow),0 0 20px rgba(58,219,255,.3);animation:pulseDot 3s infinite}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.6)}}
+.nav-right{display:flex;align-items:center;gap:2.5rem}
+.nav-right a{color:var(--text);opacity:.4;text-decoration:none;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;font-weight:400;transition:all .4s;position:relative}
+.nav-right a:not(.nav-buy)::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:1px;background:var(--glow);transform:scaleX(0);transform-origin:right;transition:transform .4s cubic-bezier(.23,1,.32,1)}
+.nav-right a:not(.nav-buy):hover::after{transform:scaleX(1);transform-origin:left}
+.nav-right a:hover{opacity:1;color:var(--glow)}
+.nav-buy{padding:.55rem 1.8rem;border:1px solid rgba(58,219,255,.25);border-radius:100px;color:var(--glow)!important;opacity:1!important;background:rgba(58,219,255,.04);transition:all .4s cubic-bezier(.23,1,.32,1)!important;cursor:pointer}
+.nav-buy:hover{background:rgba(58,219,255,.1)!important;border-color:rgba(58,219,255,.5);box-shadow:0 0 50px rgba(58,219,255,.12),inset 0 0 25px rgba(58,219,255,.04);transform:translateY(-1px)}
+.hero{position:relative;z-index:2;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% 35%,rgba(58,219,255,.05) 0%,transparent 60%);pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:0;left:0;right:0;height:250px;background:linear-gradient(0deg,var(--abyss),transparent);pointer-events:none}
+.seal-container{position:relative;margin-bottom:2.5rem}
+.seal-img{width:150px;height:150px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(58,219,255,.2);animation:sealFloat 8s ease-in-out infinite;position:relative;z-index:2;box-shadow:0 0 60px rgba(58,219,255,.1)}
+.seal-ring{position:absolute;inset:-15px;border-radius:50%;border:1px solid rgba(58,219,255,.08);animation:ringPulse 5s ease-in-out infinite}
+.seal-ring:nth-child(2){inset:-32px;animation-delay:1.2s;border-color:rgba(58,219,255,.05)}
+.seal-ring:nth-child(3){inset:-52px;animation-delay:2.4s;border-color:rgba(58,219,255,.025)}
+.seal-glow{position:absolute;inset:-50px;border-radius:50%;background:radial-gradient(circle,rgba(58,219,255,.12) 0%,transparent 70%);animation:glowPulse 5s ease-in-out infinite;z-index:1}
+@keyframes sealFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes ringPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.4}}
+@keyframes glowPulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.15)}}
+.hero-eyebrow{font-size:.65rem;letter-spacing:.7em;text-transform:uppercase;color:var(--glow);opacity:.5;margin-bottom:1.5rem;font-weight:300}
+.hero-title{font-family:'Cormorant',serif;font-size:clamp(3.5rem,10vw,9.5rem);font-weight:300;font-style:italic;line-height:.92;color:transparent;background:linear-gradient(175deg,var(--white) 0%,var(--glow) 55%,var(--glow2) 100%);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 80px rgba(58,219,255,.12));margin-bottom:1.5rem;letter-spacing:-.02em}
+.hero-desc{font-family:'Cormorant',serif;font-size:clamp(1rem,2vw,1.3rem);font-weight:300;color:var(--text);opacity:.4;max-width:400px;line-height:1.9;margin-bottom:3.5rem}
+.hero-actions{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:center}
+.btn-glow{position:relative;padding:.9rem 3rem;background:transparent;border:none;border-radius:100px;color:var(--white);font-size:.75rem;letter-spacing:.25em;text-transform:uppercase;font-family:'Outfit',sans-serif;font-weight:300;text-decoration:none;cursor:pointer;overflow:hidden;transition:all .5s cubic-bezier(.23,1,.32,1)}
+.btn-glow::before{content:'';position:absolute;inset:0;border-radius:100px;padding:1px;background:linear-gradient(135deg,rgba(58,219,255,.5),rgba(26,138,255,.15),rgba(58,219,255,.5));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.btn-glow::after{content:'';position:absolute;inset:0;border-radius:100px;background:linear-gradient(135deg,rgba(58,219,255,.06),rgba(26,138,255,.03));z-index:-1;transition:all .5s}
+.btn-glow:hover{transform:translateY(-3px);box-shadow:0 0 60px rgba(58,219,255,.18),0 15px 50px rgba(0,0,0,.4)}
+.btn-glow:hover::after{background:linear-gradient(135deg,rgba(58,219,255,.14),rgba(26,138,255,.07))}
+.btn-ghost{padding:.9rem 3rem;background:transparent;border:1px solid rgba(255,255,255,.06);border-radius:100px;color:var(--text);opacity:.35;font-size:.75rem;letter-spacing:.25em;text-transform:uppercase;font-family:'Outfit',sans-serif;font-weight:300;text-decoration:none;cursor:pointer;transition:all .5s cubic-bezier(.23,1,.32,1)}
+.btn-ghost:hover{opacity:.7;border-color:rgba(255,255,255,.15);transform:translateY(-3px)}
+.scroll-cue{position:absolute;bottom:2.5rem;display:flex;flex-direction:column;align-items:center;gap:.6rem;opacity:.2;z-index:5}
+.scroll-cue span{font-size:.55rem;letter-spacing:.5em;text-transform:uppercase;font-weight:300}
+.scroll-cue svg{animation:scrollBob 2.5s ease-in-out infinite}
+@keyframes scrollBob{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(8px);opacity:1}}
+.marquee{position:relative;z-index:2;overflow:hidden;padding:.85rem 0;border-top:1px solid rgba(58,219,255,.03);border-bottom:1px solid rgba(58,219,255,.03);background:rgba(2,18,36,.5)}
+.marquee-track{display:flex;gap:4rem;animation:marqueeDrift 40s linear infinite;width:max-content}
+.marquee-track span{font-size:.6rem;letter-spacing:.4em;text-transform:uppercase;color:var(--glow);opacity:.2;white-space:nowrap;font-weight:300}
+@keyframes marqueeDrift{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+section{position:relative;z-index:2;padding:9rem 2rem}
+.container{max-width:880px;margin:0 auto}
+.sec-label{font-size:.58rem;letter-spacing:.7em;text-transform:uppercase;color:var(--glow);opacity:.35;margin-bottom:.8rem;font-weight:300}
+.sec-title{font-family:'Cormorant',serif;font-size:clamp(2.2rem,5vw,4.2rem);font-weight:300;font-style:italic;color:var(--white);line-height:1.1;margin-bottom:1rem}
+.sec-subtitle{font-size:.88rem;color:var(--text);opacity:.3;max-width:480px;line-height:1.9}
+.origin{text-align:center;background:radial-gradient(ellipse 70% 50% at 50% 50%,rgba(58,219,255,.025) 0%,transparent 70%)}
+.origin-poem{font-family:'Cormorant',serif;font-size:clamp(1.15rem,2.5vw,1.65rem);font-weight:300;font-style:italic;line-height:2.5;color:var(--white);opacity:.45;max-width:580px;margin:3rem auto 0}
+.origin-poem em{color:var(--glow);opacity:1;font-style:italic}
+.origin-poem .pause{display:block;height:1.8rem}
+.doctrine-row{display:grid;grid-template-columns:repeat(2,1fr);gap:1.5rem;margin-top:3.5rem}
+.d-card{position:relative;padding:2.8rem 2.2rem;border-radius:24px;overflow:hidden;background:rgba(255,255,255,.012);border:1px solid rgba(58,219,255,.05);transition:all .7s cubic-bezier(.23,1,.32,1);backdrop-filter:blur(10px)}
+.d-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(58,219,255,.15),transparent);opacity:0;transition:opacity .5s}
+.d-card::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(58,219,255,.04) 0%,transparent 60%);opacity:0;transition:opacity .5s}
+.d-card:hover{border-color:rgba(58,219,255,.1);transform:translateY(-8px);box-shadow:0 40px 100px rgba(0,0,0,.35),0 0 80px rgba(58,219,255,.04)}
+.d-card:hover::before{opacity:1}.d-card:hover::after{opacity:1}
+.d-card-num{font-family:'Cormorant',serif;font-size:3.5rem;font-weight:300;color:var(--glow);opacity:.08;line-height:1;margin-bottom:.5rem;position:relative;z-index:1}
+.d-card h3{font-family:'Cormorant',serif;font-size:1.35rem;font-weight:500;color:var(--white);margin-bottom:.8rem;position:relative;z-index:1}
+.d-card p{font-size:.83rem;color:var(--text);opacity:.35;line-height:1.95;position:relative;z-index:1}
+.enemy{background:linear-gradient(180deg,transparent 0%,rgba(25,5,8,.12) 50%,transparent 100%)}
+.resistance-list{margin-top:3.5rem}
+.r-item{display:flex;align-items:flex-start;gap:2.5rem;padding:2.8rem 0;border-bottom:1px solid rgba(255,255,255,.025);transition:all .5s cubic-bezier(.23,1,.32,1)}
+.r-item:hover{padding-left:1.2rem}.r-item:last-child{border-bottom:none}
+.r-num{font-family:'Cormorant',serif;font-size:4rem;font-weight:300;color:var(--glow);opacity:.08;line-height:.9;min-width:80px;text-align:right;transition:all .5s}
+.r-item:hover .r-num{opacity:.2;color:var(--danger)}
+.r-item h4{font-family:'Cormorant',serif;font-size:1.25rem;font-weight:500;color:var(--white);margin-bottom:.5rem;transition:color .4s}
+.r-item:hover h4{color:rgba(255,200,210,.9)}
+.r-item p{font-size:.83rem;color:var(--text);opacity:.3;line-height:1.9}
+.culture{text-align:center}
+.culture-lines{font-family:'Cormorant',serif;font-size:clamp(1.4rem,3vw,2.2rem);font-weight:300;font-style:italic;line-height:2.8;color:var(--text);opacity:.25;margin-top:3rem}
+.culture-lines .lit{color:var(--glow);opacity:1;text-shadow:0 0 40px rgba(58,219,255,.15)}
+.culture-lines .sacred{color:var(--white);opacity:.55}
+.divider{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;padding:1rem 0}
+.divider-line{width:80px;height:1px;background:linear-gradient(90deg,transparent,rgba(58,219,255,.15),transparent)}
+.oath{text-align:center;padding:11rem 2rem;background:radial-gradient(ellipse 60% 40% at 50% 60%,rgba(58,219,255,.035) 0%,transparent 70%)}
+.oath-stanza{font-family:'Cormorant',serif;font-size:clamp(1.5rem,3.5vw,2.5rem);font-weight:300;font-style:italic;line-height:2.5;color:var(--text);opacity:.25;margin-bottom:3rem}
+.oath-stanza span{display:block}
+.oath-final{font-family:'Cormorant',serif;font-size:clamp(2.5rem,7vw,6rem);font-weight:300;font-style:italic;line-height:1;color:transparent;background:linear-gradient(175deg,var(--white) 15%,var(--glow) 75%);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 60px rgba(58,219,255,.15));margin-bottom:4rem}
+.oath-cta{margin-bottom:2.5rem}
+.ca-container{display:inline-flex;align-items:center;gap:1rem;padding:.7rem .8rem .7rem 1.5rem;border-radius:100px;cursor:pointer;background:rgba(58,219,255,.025);border:1px solid rgba(58,219,255,.06);transition:all .5s cubic-bezier(.23,1,.32,1)}
+.ca-container:hover{border-color:rgba(58,219,255,.2);background:rgba(58,219,255,.05);box-shadow:0 0 50px rgba(58,219,255,.06);transform:translateY(-2px)}
+.ca-label{font-size:.55rem;letter-spacing:.3em;text-transform:uppercase;color:var(--glow);opacity:.5;font-weight:300;transition:all .3s}
+.ca-addr{font-family:'Outfit',monospace;font-size:.7rem;color:var(--text);opacity:.4;letter-spacing:.03em}
+.ca-copy{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;background:rgba(58,219,255,.06);color:var(--glow);font-size:.75rem;transition:all .4s}
+.ca-container:hover .ca-copy{background:rgba(58,219,255,.12)}
+.ca-copied{border-color:var(--glow3)!important}
+.ca-copied .ca-label{color:var(--glow3)!important;opacity:1!important}
+.socials{display:flex;gap:.8rem;justify-content:center;margin-top:2.5rem}
+.social-pill{display:flex;align-items:center;gap:.5rem;padding:.55rem 1.4rem;border-radius:100px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);color:var(--text);opacity:.35;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;font-weight:300;transition:all .4s cubic-bezier(.23,1,.32,1)}
+.social-pill:hover{opacity:.85;border-color:rgba(58,219,255,.2);color:var(--glow);background:rgba(58,219,255,.04);transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.social-pill svg{width:14px;height:14px}
+footer{position:relative;z-index:2;text-align:center;padding:4rem 2rem 2.5rem;border-top:1px solid rgba(255,255,255,.02)}
+.footer-mark{font-family:'Cormorant',serif;font-size:1rem;font-weight:500;color:var(--glow);opacity:.25;margin-bottom:.8rem;letter-spacing:.1em}
+.footer-creed{font-family:'Cormorant',serif;font-size:.85rem;font-style:italic;color:var(--text);opacity:.12;margin-bottom:.5rem}
+.footer-copy{font-size:.55rem;color:var(--text);opacity:.08;letter-spacing:.1em}
+.rv{opacity:0;transform:translateY(60px);transition:all 1.1s cubic-bezier(.23,1,.32,1)}
+.rv.show{opacity:1;transform:translateY(0)}
+.rv-d1{transition-delay:.12s}.rv-d2{transition-delay:.24s}.rv-d3{transition-delay:.36s}.rv-d4{transition-delay:.48s}
+.hero-enter>*{opacity:0;transform:translateY(45px)}
+.hero-enter.go>*{opacity:1;transform:translateY(0);transition:all 1.2s cubic-bezier(.23,1,.32,1)}
+.hero-enter.go>:nth-child(1){transition-delay:.2s}
+.hero-enter.go>:nth-child(2){transition-delay:.45s}
+.hero-enter.go>:nth-child(3){transition-delay:.65s}
+.hero-enter.go>:nth-child(4){transition-delay:.85s}
+.hero-enter.go>:nth-child(5){transition-delay:1.05s}
+.depth-line{position:fixed;z-index:1;pointer-events:none;opacity:.025}
+.depth-line-h{left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 10%,var(--glow) 50%,transparent 90%)}
+.depth-line-v{top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent 10%,var(--glow) 50%,transparent 90%)}
+@media(max-width:768px){
+  nav{padding:1rem 1.5rem}nav.solid{padding:.8rem 1.5rem}
+  .nav-right a:not(.nav-buy){display:none}section{padding:6rem 1.5rem}
+  .doctrine-row{grid-template-columns:1fr}.r-item{flex-direction:column;gap:1rem}
+  .r-num{text-align:left;min-width:auto;font-size:3rem}.seal-img{width:115px;height:115px}
+  .ca-addr{font-size:.58rem}.oath{padding:7rem 1.5rem}.socials{flex-wrap:wrap}
+  .hero-actions{flex-direction:column;align-items:center}.cursor-glow{display:none}
+  .menu-btn{display:flex;flex-direction:column;gap:4px;cursor:pointer;padding:5px;z-index:1001}
+  .menu-btn span{width:20px;height:1.5px;background:var(--text);opacity:.4;transition:all .3s;display:block}
+}
+@media(min-width:769px){.menu-btn{display:none}}
+
+/* FLOW generator (React mount) */
+.generator{padding:7rem 0 6rem;position:relative}
+.gen-grid{display:grid;grid-template-columns:1fr;gap:1.4rem;margin-top:2.5rem}
+@media(min-width:900px){.gen-grid{grid-template-columns:1fr 1fr}}
+.gen-card{border-radius:32px;border:1px solid rgba(58,219,255,.18);background:rgba(1,10,20,.55);box-shadow:0 0 0 1px rgba(255,255,255,.03),0 18px 60px rgba(0,0,0,.55);backdrop-filter:blur(12px);padding:2rem}
+.gen-card h3{font-family:'Cormorant',serif;font-size:1.6rem;font-weight:600;letter-spacing:.02em;color:var(--white)}
+.gen-sub{color:rgba(196,223,240,.72);font-size:.95rem;line-height:1.5;margin-top:.4rem}
+.gen-field{margin-top:1.2rem}
+.gen-label{font-size:.75rem;letter-spacing:.22em;text-transform:uppercase;color:rgba(196,223,240,.75)}
+.gen-input{margin-top:.55rem;width:100%;border-radius:18px;border:1px solid rgba(58,219,255,.18);background:rgba(0,0,0,.25);color:var(--white);padding:1rem 1.1rem;font-size:.95rem;outline:none;transition:box-shadow .25s ease,border-color .25s ease}
+.gen-input:focus{border-color:rgba(58,219,255,.45);box-shadow:0 0 0 4px rgba(58,219,255,.12)}
+.gen-row{display:flex;gap:.8rem;align-items:center}
+.gen-row .gen-input{flex:1}
+.gen-btn{display:inline-flex;align-items:center;justify-content:center;min-width:9rem}
+.gen-helper{margin-top:.7rem;color:rgba(196,223,240,.55);font-size:.78rem}
+.gen-error{margin-top:1rem;border-radius:18px;border:1px solid rgba(255,58,92,.35);background:rgba(255,58,92,.12);padding:1rem 1.1rem;color:rgba(255,220,228,.95);font-size:.9rem}
+.gen-output-box{margin-top:1rem;border-radius:22px;border:1px solid rgba(58,219,255,.16);background:rgba(0,0,0,.22);padding:.9rem}
+.gen-placeholder{aspect-ratio:16/9;border-radius:18px;border:1px dashed rgba(58,219,255,.22);display:grid;place-items:center;color:rgba(196,223,240,.6);font-size:.95rem}
+.gen-video{width:100%;border-radius:18px;display:block}
+.file-input{margin-top:.75rem}
+.file-input input[type=file]{width:100%;color:rgba(196,223,240,.75)}
+.file-input input[type=file]::file-selector-button{margin-right:1rem;border:0;border-radius:999px;padding:.75rem 1.2rem;background:rgba(232,244,255,.92);color:#071222;font-family:'Outfit',sans-serif;font-weight:400;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.file-input input[type=file]::file-selector-button:hover{background:rgba(232,244,255,.82)}
+
+</style>
+</head>
+<body>
+<div class="loader" id="loader"><div class="loader-ring"></div><div class="loader-text">entering the current</div></div>
+<div class="cursor-glow" id="cursorGlow"></div>
+<canvas id="waterCanvas"></canvas>
+<div class="depth-line depth-line-h" style="top:25%"></div>
+<div class="depth-line depth-line-h" style="top:50%"></div>
+<div class="depth-line depth-line-h" style="top:75%"></div>
+<div class="depth-line depth-line-v" style="left:20%"></div>
+<div class="depth-line depth-line-v" style="left:80%"></div>
+
+<nav id="nav">
+  <div class="nav-brand"><span class="dot"></span> $FLOW</div>
+  <div class="nav-right">
+    <a href="#origin">Origin</a>
+    <a href="#doctrine">Doctrine</a>
+    <a href="#generator">Generator</a>
+    <a href="#oath">Oath</a>
+    <a href="https://x.com/" target="_blank">𝕏</a>
+    <a href="#oath" class="nav-buy">Buy $FLOW</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-enter" id="heroEnter">
+    <div class="seal-container">
+      <div class="seal-glow"></div><div class="seal-ring"></div><div class="seal-ring"></div><div class="seal-ring"></div>
+      <img src="seal.png" class="seal-img" alt="$FLOW">
+    </div>
+    <div class="hero-eyebrow">The tide has surfaced</div>
+    <h1 class="hero-title">Embrace<br>the Flow</h1>
+    <p class="hero-desc">The market is water. Water cannot be conquered. Only entered.</p>
+    <div class="hero-actions">
+      <a href="#" class="btn-glow">Buy $FLOW</a>
+      <a href="#origin" class="btn-ghost">Read Manifesto</a>
+    </div>
+  </div>
+  <div class="scroll-cue">
+    <span>Descend</span>
+    <svg width="16" height="24" viewBox="0 0 16 24" fill="none">
+      <rect x="6" y="1" width="4" height="10" rx="2" stroke="rgba(58,219,255,.25)" stroke-width="1"/>
+      <path d="M8 16 L8 22" stroke="rgba(58,219,255,.25)" stroke-width="1" stroke-linecap="round"/>
+      <path d="M4 19 L8 23 L12 19" stroke="rgba(58,219,255,.25)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+</section>
+
+<div class="marquee"><div class="marquee-track" id="marquee"></div></div>
+
+<section class="origin" id="origin">
+  <div class="container">
+    <div class="sec-label rv">I. The Origin</div>
+    <div class="sec-title rv rv-d1">Before Everything</div>
+    <div class="origin-poem rv rv-d2">
+      Before charts. Before leverage. Before fear.<br>There was <em>motion</em>.
+      <span class="pause"></span>
+      Markets were never chaos. They were <em>currents</em>.<br>Humans arrived and tried to control them.
+      <span class="pause"></span>
+      They named tops. They predicted bottoms.<br>They resisted the tide. They <em>suffered</em>.
+      <span class="pause"></span>
+      A few observed differently:<br>Water does not resist gravity. It moves with it.
+      <span class="pause"></span>
+      The market is water.<br>And water cannot be conquered.<br><em>Only entered.</em>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><div class="divider-line"></div></div>
+
+<section id="doctrine">
+  <div class="container" style="text-align:center">
+    <div class="sec-label rv">II. The Doctrine</div>
+    <div class="sec-title rv rv-d1">What We Believe</div>
+    <p class="sec-subtitle rv rv-d2" style="margin:0 auto">$FLOW is not about profit. Profit is a byproduct of alignment.</p>
+    <div class="doctrine-row">
+      <div class="d-card rv rv-d1"><div class="d-card-num">01</div><h3>The Market is Water</h3><p>It moves with gravity, not against it. Those who stop fighting volatility discover the current.</p></div>
+      <div class="d-card rv rv-d2"><div class="d-card-num">02</div><h3>Volatility is Natural</h3><p>Resistance creates suffering. Acceptance creates clarity. Clarity creates inevitability.</p></div>
+      <div class="d-card rv rv-d3"><div class="d-card-num">03</div><h3>Flow Creates Inevitability</h3><p>When you stop predicting and start observing, the path reveals itself. Flow removes all friction.</p></div>
+      <div class="d-card rv rv-d4"><div class="d-card-num">04</div><h3>The Initiation</h3><p>The moment the market dips and instead of fear, you feel calm. You are no longer reacting. You are in the current.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><div class="divider-line"></div></div>
+
+<section class="enemy">
+  <div class="container">
+    <div class="sec-label rv">III. The Enemy</div>
+    <div class="sec-title rv rv-d1">Resistance is Suffering</div>
+    <p class="sec-subtitle rv rv-d2">The enemy is not another coin. The enemy is within.</p>
+    <div class="resistance-list">
+      <div class="r-item rv"><div class="r-num">I</div><div><h4>Panic Selling</h4><p>The first mask of resistance. Born from fear, fed by impulse. The current was moving — you jumped out.</p></div></div>
+      <div class="r-item rv"><div class="r-num">II</div><div><h4>Ego</h4><p>Ego predicts. Ego names tops. Ego fights the current. Ego drowns while the water carries the humble.</p></div></div>
+      <div class="r-item rv"><div class="r-num">III</div><div><h4>Emotional Reaction</h4><p>Resistance creates stress. Stress creates mistakes. Mistakes create loss. The cycle feeds itself until you break it.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"><div class="divider-line"></div></div>
+
+<section class="culture">
+  <div class="container">
+    <div class="sec-label rv">V. The Culture</div>
+    <div class="sec-title rv rv-d1">We Are Water</div>
+    <div class="culture-lines rv rv-d2">
+      We do not chase. We do not beg. We do not panic.<br><br>
+      <span class="lit">Red is flow.</span><br><span class="lit">Green is flow.</span><br>
+      <span class="sacred">Sideways is sacred.</span><br><br>
+      Liquidity is eternal.<br><span class="lit">Resistance is suffering.</span>
+    </div>
+  </div>
+</section>
+
+<section class="oath" id="oath">
+  <div class="container">
+    <div class="sec-label rv">VI. The Oath</div>
+    <div class="sec-title rv rv-d1" style="margin-bottom:3rem">Swear the Oath</div>
+    <div class="divider"><div class="divider-line"></div></div>
+    <div class="oath-stanza rv rv-d2">
+      <span>I do not fight the current.</span><span>I do not predict the tide.</span><span>I align with motion.</span>
+    </div>
+    <div class="oath-final rv rv-d3">I embrace the flow.</div>
+    <div class="oath-cta rv rv-d4"><a href="#" class="btn-glow" style="font-size:.82rem;padding:1.1rem 3.8rem">Buy $FLOW</a></div>
+    <div class="ca-container rv" onclick="copyCA()" id="caBox">
+      <span class="ca-label" id="caLabel">CA</span>
+      <span class="ca-addr">2oGDe9FKpXeceCyF5jqUHACSvvyoXvBrshDjKkqnpump</span>
+      <div class="ca-copy">⧉</div>
+    </div>
+    <div class="socials rv">
+      <a href="https://x.com/" target="_blank" class="social-pill">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Twitter
+      </a>
+      <a href="#" class="social-pill">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        DexScreener
+      </a>
+      <a href="#" class="social-pill">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-8v4h4l-5 8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Pump.fun
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-mark">$FLOW</div>
+  <p class="footer-creed">The market is water. Water cannot be conquered. Only entered.</p>
+  <p class="footer-copy">© 2025 $FLOW — All rights reserved</p>
+</footer>
+
+
+<section class="generator" id="generator">
+  <div class="container">
+    <div class="sec-label rv">VII. The Generator</div>
+    <div class="sec-title rv rv-d1" style="margin-bottom:3rem">Generate your FLOW clip</div>
+    <div class="divider"><div class="divider-line"></div></div>
+    <div id="root"></div>
+  </div>
+</section>
+
+<script>
+window.addEventListener('load',()=>{setTimeout(()=>{document.getElementById('loader').classList.add('done');setTimeout(()=>document.getElementById('heroEnter').classList.add('go'),300)},1200)});
+
+const c=document.getElementById('waterCanvas');const gl=c.getContext('webgl')||c.getContext('experimental-webgl');
+if(gl){
+function resize(){c.width=window.innerWidth;c.height=window.innerHeight;gl.viewport(0,0,c.width,c.height)}
+resize();window.addEventListener('resize',resize);
+const vs=`attribute vec2 p;void main(){gl_Position=vec4(p,0,1);}`;
+const fs=`precision mediump float;
+uniform float t;uniform vec2 r;uniform vec2 mouse;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+void main(){
+vec2 uv=(gl_FragCoord.xy-.5*r)/min(r.x,r.y);float d=length(uv);
+float wave=0.0;
+for(float i=1.0;i<6.0;i++){float speed=0.3+i*0.08;wave+=sin(uv.x*i*3.5+t*speed)*0.018/i;wave+=sin(uv.y*i*2.8+t*speed*0.8)*0.018/i;wave+=sin((uv.x+uv.y)*i*2.2+t*0.45)*0.012/i;wave+=cos(uv.x*i*1.8-uv.y*i*2.0+t*speed*0.6)*0.01/i;}
+float caustic=0.0;for(float i=1.0;i<4.0;i++){vec2 cuv=uv*i*4.0+t*0.2*i;caustic+=sin(cuv.x)*sin(cuv.y)*0.5+0.5;}caustic/=3.0;caustic=pow(caustic,2.5);
+float n=noise(uv*3.0+t*0.15)*0.015;
+vec3 abyss=vec3(0.004,0.035,0.07);vec3 deep=vec3(0.02,0.06,0.12);vec3 glow=vec3(0.14,0.52,0.78);vec3 bright=vec3(0.23,0.86,1.0);
+float depth=smoothstep(1.4,0.0,d);vec3 col=mix(abyss,deep,depth);col+=glow*(wave*2.5+n)*depth;col+=bright*caustic*0.035*depth;col*=1.0-d*0.4;
+vec2 muv=(mouse-.5*r)/min(r.x,r.y);float md=length(uv-muv);col+=bright*0.012*exp(-md*4.0);
+gl_FragColor=vec4(col,1);}`;
+function createShader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s}
+const prog=gl.createProgram();gl.attachShader(prog,createShader(gl.VERTEX_SHADER,vs));gl.attachShader(prog,createShader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(prog);gl.useProgram(prog);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+const pLoc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(pLoc);gl.vertexAttribPointer(pLoc,2,gl.FLOAT,false,0,0);
+const tLoc=gl.getUniformLocation(prog,'t'),rLoc=gl.getUniformLocation(prog,'r'),mLoc=gl.getUniformLocation(prog,'mouse');
+let mx=window.innerWidth/2,my=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY});
+function render(time){gl.uniform1f(tLoc,time*0.001);gl.uniform2f(rLoc,c.width,c.height);gl.uniform2f(mLoc,mx,c.height-my);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);requestAnimationFrame(render)}
+requestAnimationFrame(render);
+}else{c.style.background='radial-gradient(ellipse at center,#051830,#010a14)'}
+
+const pc=document.createElement('canvas');pc.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:.4';document.body.appendChild(pc);
+const pctx=pc.getContext('2d');let pw,ph;
+function presz(){pw=pc.width=window.innerWidth;ph=pc.height=window.innerHeight}presz();window.addEventListener('resize',presz);
+const pts=Array.from({length:80},()=>({x:Math.random()*2000,y:Math.random()*2000,s:Math.random()*1.8+.2,vx:(Math.random()-.5)*.15,vy:(Math.random()-.5)*.08,o:Math.random()*.35+.03,ph:Math.random()*6.28}));
+function drawParticles(){pctx.clearRect(0,0,pw,ph);const sy=window.scrollY;pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.ph+=.006;if(p.x<0||p.x>pw)p.vx*=-1;if(p.y<0||p.y>ph*3)p.vy*=-1;const dy=p.y-sy;if(dy<-100||dy>ph+100)return;const op=p.o*(.4+.6*Math.sin(p.ph));pctx.beginPath();pctx.arc(p.x,dy,p.s,0,6.28);pctx.fillStyle=`rgba(58,219,255,${op})`;pctx.fill()});requestAnimationFrame(drawParticles)}drawParticles();
+
+const cg=document.getElementById('cursorGlow');let cgx=0,cgy=0,cgTx=0,cgTy=0;
+document.addEventListener('mousemove',e=>{cgTx=e.clientX;cgTy=e.clientY});
+function animCursor(){cgx+=(cgTx-cgx)*.07;cgy+=(cgTy-cgy)*.07;cg.style.left=cgx+'px';cg.style.top=cgy+'px';requestAnimationFrame(animCursor)}animCursor();
+
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('solid',scrollY>60)});
+
+const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('show')})},{threshold:0.1,rootMargin:'0px 0px -50px 0px'});
+document.querySelectorAll('.rv').forEach(el=>obs.observe(el));
+
+const mq=['EMBRACE THE FLOW','$FLOW','RESISTANCE IS SUFFERING','THE MARKET IS WATER','LIQUIDITY IS ETERNAL','RED IS FLOW','GREEN IS FLOW','SIDEWAYS IS SACRED','WATER CANNOT BE CONQUERED','ONLY ENTERED','VOLATILITY IS NATURAL'];
+document.getElementById('marquee').innerHTML=[...mq,...mq].map(t=>`<span>◇ ${t}</span>`).join('');
+
+function copyCA(){navigator.clipboard.writeText('2oGDe9FKpXeceCyF5jqUHACSvvyoXvBrshDjKkqnpump').then(()=>{const l=document.getElementById('caLabel');l.textContent='COPIED';document.getElementById('caBox').classList.add('ca-copied');setTimeout(()=>{l.textContent='CA';document.getElementById('caBox').classList.remove('ca-copied')},2500)})}
+
+document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click',e=>{const t=document.querySelector(a.getAttribute('href'));if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth'})}})});
+
+const depthLines=document.querySelectorAll('.depth-line');
+window.addEventListener('scroll',()=>{const sy=window.scrollY;depthLines.forEach((l,i)=>{l.style.transform=`translateY(${sy*(0.02+i*0.01)}px)`})});
+</script>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
