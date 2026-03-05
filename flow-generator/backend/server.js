@@ -5,21 +5,35 @@ import { v4 as uuid } from "uuid";
 import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
-import ffmpegPath from "ffmpeg-static";
-import ffprobePath from "ffprobe-static";
+import ffmpegStatic from "ffmpeg-static";
+import ffprobeStatic from "ffprobe-static";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const upload = multer({ dest: "uploads/" });
+// Limit upload size to avoid OOM on small instances
+const upload = multer({
+  dest: "uploads/",
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+});
 
 // Put your base trader video in ./assets/trader.mp4
-// Requirement: keep original video size (no crop/pad).
 const BASE_VIDEO = path.join("assets", "trader.mp4");
-// Requirement: output should have the same length as the base video.
+
 const OUT_DIR = "out";
-if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR);
+if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
+if (!fs.existsSync("uploads")) fs.mkdirSync("uploads", { recursive: true });
+
+// Use ffmpeg-static by default; can be overridden with env vars if you later switch
+const FFMPEG =
+  process.env.FFMPEG_PATH ||
+  (ffmpegStatic?.path || ffmpegStatic) ||
+  "ffmpeg";
+const FFPROBE =
+  process.env.FFPROBE_PATH ||
+  (ffprobeStatic?.path || ffprobeStatic) ||
+  "ffprobe";
 
 function run(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -31,8 +45,6 @@ function run(cmd, args) {
 }
 
 async function probeVideo(filePath) {
-  // ffprobe-static exports { path } in CommonJS and default export in ESM builds; normalize.
-  const fp = (ffprobePath && (ffprobePath.path || ffprobePath)) || "ffprobe";
   const args = [
     "-v",
     "error",
@@ -42,7 +54,7 @@ async function probeVideo(filePath) {
     "-show_format",
     filePath,
   ];
-  const { stdout } = await run(fp, args);
+  const { stdout } = await run(FFPROBE, args);
   const info = JSON.parse(stdout);
   const v = (info.streams || []).find((s) => s.codec_type === "video");
   const w = Number(v?.width);
@@ -55,33 +67,30 @@ async function probeVideo(filePath) {
   };
 }
 
-// FFmpeg filtergraph gotcha (esp. on Windows): commas inside expressions must be escaped,
-// otherwise they are interpreted as filter separators.
+// FFmpeg filtergraph gotcha: commas inside expressions must be escaped
 function escapeExpr(expr) {
   return String(expr).replace(/,/g, "\\,");
-}
-
-function escapeForFFmpeg(text) {
-  return String(text)
-    .replace(/\\/g, "\\\\")
-    .replace(/:/g, "\\:")
-    .replace(/'/g, "\\'")
-    .replace(/\n/g, " ");
 }
 
 app.get("/", (_, res) => res.send("FLOW renderer online"));
 
 app.post("/render", upload.single("image"), async (req, res) => {
+  const inputImg = req.file?.path;
+
+  const safeUnlink = (p) => {
+    if (!p) return;
+    fs.unlink(p, () => {});
+  };
+
   try {
     if (!fs.existsSync(BASE_VIDEO)) {
+      safeUnlink(inputImg);
       return res.status(400).json({ error: "Missing backend/assets/trader.mp4" });
     }
 
-    // Overlay is always 100% opaque.
-    const overlayAlpha = 1.0;
+    if (!inputImg) return res.status(400).json({ error: "Missing image upload" });
 
-    // Overlay time window (seconds). Requirement: from 00:02:00 to 00:05:00.
-    // Interpreted as 2s..5s for ~10s clips. Override by sending overlayStart/overlayEnd.
+    // Overlay time window (seconds). Default 2..5
     const overlayStart = Number.isFinite(Number(req.body.overlayStart))
       ? Number(req.body.overlayStart)
       : 2;
@@ -89,21 +98,12 @@ app.post("/render", upload.single("image"), async (req, res) => {
       ? Number(req.body.overlayEnd)
       : 5;
 
-
-    // Text overlay window (seconds). Requirement: from 00:05:00 until 00:09:28 (interpreted as 5.0s..9.28s).
-    const textStart = Number.isFinite(Number(req.body.textStart))
-      ? Number(req.body.textStart)
-      : 5;
-    const textEnd = Number.isFinite(Number(req.body.textEnd))
-      ? Number(req.body.textEnd)
-      : 9.28;
-
-    // Cut final video at 00:09:28 (interpreted as 9.28s). Override by sending cutAt.
+    // Cut final video (seconds). Default 9.85
     const cutAt = Number.isFinite(Number(req.body.cutAt))
       ? Number(req.body.cutAt)
-      : 9.28;
+      : 9.85;
 
-    // Mini zoom (applied to the BASE video only). Default: short zoom at end of overlay window.
+    // Mini zoom bump (applied to base video only)
     const zoomStart = Number.isFinite(Number(req.body.zoomStart))
       ? Number(req.body.zoomStart)
       : overlayEnd;
@@ -114,90 +114,86 @@ app.post("/render", upload.single("image"), async (req, res) => {
       ? Number(req.body.zoomAmount)
       : 0.02; // +2%
 
-    const inputImg = req.file?.path;
-    if (!inputImg) return res.status(400).json({ error: "Missing image upload" });
-
-    const id = uuid();
-    // No background removal (use uploaded image as-is).
-    const overlayImg = inputImg;
-    const outMp4 = path.join(OUT_DIR, `${id}.mp4`);
+    const overlayAlpha = 1.0;
+    const enableExpr = `between(t,${overlayStart},${overlayEnd})`;
 
     const { width: W, height: H, duration: D } = await probeVideo(BASE_VIDEO);
     if (!W || !H) {
+      safeUnlink(inputImg);
       return res.status(500).json({ error: "Could not read base video dimensions" });
     }
-    const outSeconds = Number.isFinite(cutAt) ? Math.min(cutAt, (D && D > 0 ? D : cutAt)) : (D && D > 0 ? D : undefined);
 
-    // Mini zoom "bump" (zoom in then back out). This matches a quick scene-switch punch.
+    const outSeconds = Number.isFinite(cutAt)
+      ? Math.min(cutAt, D && D > 0 ? D : cutAt)
+      : D && D > 0
+        ? D
+        : undefined;
+
     // z(t) = 1 + zoomAmount * sin(PI * clip((t-zoomStart)/zoomDuration, 0, 1))
-    // (sin goes 0 -> 1 -> 0 over [0,1])
-    const zs = zoomStart;
     const zExpr = escapeExpr(
-      `1+(${zoomAmount})*sin(PI*clip((t-${zs})/${zoomDuration},0,1))`
+      `1+(${zoomAmount})*sin(PI*clip((t-${zoomStart})/${zoomDuration},0,1))`
     );
 
-    // "Blue disco" flash overlay around the same switch moment.
-    const discoStart = Number.isFinite(Number(req.body.discoStart))
-      ? Number(req.body.discoStart)
-      : zoomStart;
-    const discoDuration = Number.isFinite(Number(req.body.discoDuration))
-      ? Number(req.body.discoDuration)
-      : 0.5;
-    const discoEnd = discoStart + discoDuration;
-    const discoAlpha = Number.isFinite(Number(req.body.discoAlpha))
-      ? Number(req.body.discoAlpha)
-      : 0.28;
+    const id = uuid();
+    const outMp4 = path.join(OUT_DIR, `${id}.mp4`);
 
-    const enableExpr = `between(t,${overlayStart},${overlayEnd})`;
-
-    const mantraText = escapeForFFmpeg(String(req.body.mantra || ""));
-
-    // Fullscreen overlay (no motion). Overlay is enabled only for the requested time window.
-    // Mini-zoom is applied to the base video around the scene switch.
+    // Filter graph: base zoom bump + fullscreen image overlay (NO disco, NO text)
     const filter = [
-      // Base video: keep original size. Apply a quick "bump" zoom by scaling and center-cropping back.
       `[0:v]format=rgba,scale=w=${W}*${zExpr}:h=${H}*${zExpr}:eval=frame,` +
-        `crop=${W}:${H}:(in_w-${W})/2:(in_h-${H})/2[b0];`,
+        `crop=${W}:${H}:(in_w-${W})/2:(in_h-${H})/2[base];`,
 
-      // Blue disco flash layer (procedural). Uses noise + strong saturation for a quick "club" look.
-      // NOTE: Avoid color alpha syntax (@) on Windows builds; set alpha via colorchannelmixer.
-      `color=c=blue:s=${W}x${H},format=rgba,noise=alls=40:allf=t+u,eq=saturation=2.2:contrast=1.15[disco];` +
-        `[disco]colorchannelmixer=aa=${discoAlpha}[discoA];` +
-        `[b0][discoA]overlay=0:0:enable='between(t,${discoStart},${discoEnd})'[base];`,
-
-      // Fullscreen user image overlay (no motion).
       `[1:v]format=rgba,scale=${W}:${H}[ol];` +
-  `[ol]colorchannelmixer=aa=${overlayAlpha}[ol2];` +
-  `[base][ol2]overlay=0:0:enable='${enableExpr}'[vid]`,
+        `[ol]colorchannelmixer=aa=${overlayAlpha}[ol2];` +
+        `[base][ol2]overlay=0:0:enable='${enableExpr}'[vid]`,
     ].join("");
 
     const args = [
       "-y",
-      "-i", BASE_VIDEO,
-      "-loop", "1",
-      "-i", overlayImg,
-      // Match output length to the base clip
+      "-i",
+      BASE_VIDEO,
+      "-loop",
+      "1",
+      "-i",
+      inputImg,
       ...(outSeconds ? ["-t", String(outSeconds)] : []),
-      "-filter_complex", filter,
-      // Explicit mapping: use filtered video, keep audio if present.
-      "-map", "[vid]",
-      "-map", "0:a?",
-      // Keep original frame rate by default. If you prefer forced 30fps, set FORCE_FPS=30.
+      "-filter_complex",
+      filter,
+      "-map",
+      "[vid]",
+      "-map",
+      "0:a?",
       ...(process.env.FORCE_FPS ? ["-r", String(process.env.FORCE_FPS)] : []),
-      "-c:v", "libx264",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "copy",
-      "-movflags", "+faststart",
-      outMp4
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "23",
+      "-pix_fmt",
+      "yuv420p",
+      "-c:a",
+      "copy",
+      "-movflags",
+      "+faststart",
+      outMp4,
     ];
 
-    await run(ffmpegPath, args);
+    await run(FFMPEG, args);
 
     res.setHeader("Content-Type", "video/mp4");
-    fs.createReadStream(outMp4).pipe(res);
+    const stream = fs.createReadStream(outMp4);
+    stream.pipe(res);
 
-    fs.unlink(inputImg, () => {});
+    stream.on("close", () => {
+      safeUnlink(inputImg);
+      safeUnlink(outMp4);
+    });
+    stream.on("error", () => {
+      safeUnlink(inputImg);
+      safeUnlink(outMp4);
+    });
   } catch (e) {
+    safeUnlink(inputImg);
     res.status(500).json({ error: e.message });
   }
 });
